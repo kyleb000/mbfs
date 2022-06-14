@@ -1,13 +1,14 @@
 use std::{
     thread::{ JoinHandle, self },
     sync::{
-        mpsc::{ Sender, Receiver, self, RecvError },
         atomic::{AtomicBool, Ordering},
         Arc
     },
     io::{ self, BufReader, BufRead },
     fs::File, time::Duration
 };
+
+use crossbeam_channel::{Sender, Receiver, RecvError};
 
 const CAPACITY:usize = 4096;
 
@@ -38,7 +39,7 @@ pub struct MessageBasedFileSystem {
 
 impl FileHandle {
     fn new(path: String, filesystem: Sender<ReadRequest>) -> Self {
-        FileHandle { path, offset: 0, iostream: mpsc::channel(), filesystem }
+        FileHandle { path, offset: 0, iostream: crossbeam_channel::unbounded(), filesystem }
     }
 
     /// Sends a read request to the file reader.
@@ -72,7 +73,7 @@ impl MessageBasedFileSystem {
         let to_run = Arc::new(AtomicBool::new(true));
         for _ in 0..10 {
             let run = to_run.clone();
-            let (sender, receiver) = mpsc::channel();
+            let (sender, receiver) = crossbeam_channel::unbounded();
             readers.push((thread::spawn(move || {
                 while run.load(Ordering::Relaxed) {
                     let req: ReadRequest = receiver.recv().unwrap();
@@ -96,7 +97,7 @@ impl MessageBasedFileSystem {
                 }
             }), sender));
         }
-        MessageBasedFileSystem { readers, request_stream: mpsc::channel(), run:to_run }
+        MessageBasedFileSystem { readers, request_stream: crossbeam_channel::unbounded(), run:to_run }
     }
 
     /// Returns a new file handle.
