@@ -11,6 +11,7 @@ use std::{
 use crossbeam_channel::{Sender, Receiver, RecvError};
 
 const CAPACITY:usize = 4096;
+const MAX_MESSAGES:usize = 256;
 
 /// Handle to a file. Keeps track of the offset of the file.
 /// When a read() request is made, this object will send a request to the
@@ -39,7 +40,7 @@ pub struct MessageBasedFileSystem {
 
 impl FileHandle {
     fn new(path: String, filesystem: Sender<ReadRequest>) -> Self {
-        FileHandle { path, offset: 0, iostream: crossbeam_channel::unbounded(), filesystem }
+        FileHandle { path, offset: 0, iostream: crossbeam_channel::bounded(MAX_MESSAGES), filesystem }
     }
 
     /// Sends a read request to the file reader.
