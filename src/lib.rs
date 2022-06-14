@@ -6,7 +6,7 @@ use std::{
         Arc
     },
     io::{ self, BufReader, BufRead },
-    fs::File
+    fs::File, time::Duration
 };
 
 const CAPACITY:usize = 4096;
@@ -116,8 +116,10 @@ impl MessageBasedFileSystem {
     /// Runs the main file reader.
     pub fn run(&self) -> Result<(), RecvError> {
         for reader in self.readers.iter() {
-            let request = self.request_stream.1.recv()?;
-            reader.1.send(request).unwrap();
+            let req_result = self.request_stream.1.recv_timeout(Duration::from_millis(10));
+            if let Ok(request) = req_result {
+                reader.1.send(request).unwrap();
+            }
         }
         Ok(())
     }
