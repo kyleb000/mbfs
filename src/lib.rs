@@ -55,6 +55,13 @@ impl FileHandle {
         self.offset += res.len();
         Ok(res)
     }
+
+    /// Get the name of the file.
+    /// # Returns
+    /// - `String` - The name of the file.
+    pub fn get_name(&self) -> String {
+        self.path.clone()
+    }
 }
 
 impl MessageBasedFileSystem {
