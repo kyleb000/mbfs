@@ -12,3 +12,4 @@ readme = "README.md"
 
 [dependencies]
 crossbeam-channel = "0.5.4"
+chashmap = "2.2.2"
