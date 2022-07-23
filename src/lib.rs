@@ -11,6 +11,9 @@ use std::{
 use crossbeam_channel::{Sender, Receiver, RecvError};
 use chashmap::CHashMap;
 
+#[cfg(test)]
+#[path = "lib_test.rs"]
+mod lib_test;
 
 /// Record for a file somewhere on the file system,
 /// along with channels for reading file data and sending
@@ -112,17 +115,10 @@ impl FilePageEntry {
     fn read(&mut self, path: String) -> io::Result<Option<Vec<u8>>> {
         if self.pages.is_empty() {
             // Attempt to repopulate the pages.
-            let res = Self::populate_pages(path, &mut self.pages, self.max_pages, self.page_size, self.current_page);
-            match res {
-                Ok(_) => {
-                    if self.pages.is_empty() {
-                        Ok(None)
-                    } else {
-                        Ok(self.pages.pop_front())
-                    }
-                },
-                Err(err) => Err(err)                
-            }
+            Self::populate_pages(path, &mut self.pages, self.max_pages, self.page_size, self.current_page)?;
+        }
+        if self.pages.is_empty() {
+            Ok(None)
         } else {
             self.current_page += 1;
             Ok(self.pages.pop_front())
@@ -154,25 +150,21 @@ impl FilePageEntry {
         page_size: usize,
         current_page: usize) -> io::Result<()> 
     {
-        match File::open(path) {
-            Ok(file) => {
-                let mut reader = BufReader::with_capacity(page_size, file);
-                reader.seek_relative((current_page * page_size).try_into().unwrap())?;
-                let mut i = 0;
-                while i < max_pages {
-                    let buffer = reader.fill_buf()?;
-                    let length = buffer.len();
-                    if length == 0 {
-                        break;
-                    }
-                    file_pages.push_back(buffer.to_vec());
-                    reader.consume(length);
-                    i += 1;
-                }
-                Ok(())
-            },
-            Err(err) => Err(err)
+        let file = File::open(path)?;
+        let mut reader = BufReader::with_capacity(page_size, file);
+        reader.seek_relative((current_page * page_size).try_into().unwrap())?;
+        let mut i = 0;
+        while i < max_pages {
+            let buffer = reader.fill_buf()?;
+            let length = buffer.len();
+            if length == 0 {
+                break;
+            }
+            file_pages.push_back(buffer.to_vec());
+            reader.consume(length);
+            i += 1;
         }
+        Ok(())
     }
 }
 
@@ -237,7 +229,11 @@ impl MessageBasedFileSystem {
             let (sender, receiver) = crossbeam_channel::unbounded();
             readers.push((thread::spawn(move || {
                 while run.load(Ordering::Relaxed) {
-                    let req: ReadRequest = receiver.recv().unwrap();
+                    let req_result = receiver.recv();
+                    if req_result.is_err() {
+                        continue;
+                    }
+                    let req: ReadRequest = req_result.unwrap();
                     if !pages_ref.contains_key(&req.path) {
                         match FilePageEntry::new(req.path.clone(), page_size, max_pages) {
                             Ok(val) => pages_ref.insert_new(req.path.clone(), val),
