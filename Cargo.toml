@@ -1,6 +1,6 @@
 [package]
 name = "mbfs"
-version = "0.1.6"
+version = "0.2.0"
 edition = "2021"
 license = "AGPL-3.0"
 homepage = "https://github.com/kyleb000/mbfs/wiki"
